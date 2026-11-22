@@ -1,5 +1,6 @@
 import re
 import os
+import time
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
@@ -10,6 +11,13 @@ url_to_fetch = links.links
 
 class IT_JOB_FINDER:
 
+    def __init__(self):
+        load_dotenv()
+        self.bot_token = os.getenv('BOT_TOKEN')
+        self.chat_id = os.getenv('CHAT_ID')
+        self.min_char = 40
+
+
     def fetch_job(self, url):
         all_jobs = []
         response = requests.get(url, timeout=15)
@@ -18,6 +26,8 @@ class IT_JOB_FINDER:
         # extract text
         soup = BeautifulSoup(response.text, "html.parser")
         messages = soup.select(".tgme_widget_message_wrap")
+
+        messages = messages[-10:]
 
         for msg in messages:
             text_le = msg.select_one(".tgme_widget_message_text")
@@ -65,28 +75,30 @@ class IT_JOB_FINDER:
 
         for job in all_jobs:
 
-            if len(job.get("text")) > MIN_CHARS and IT_PATTERN.search(job.get("text")):
+            if len(job.get("text")) > self.min_char and IT_PATTERN.search(job.get("text")):
                 it_jobs.append(job)
 
         return it_jobs
 
     def notify_telegram(self, all_it_jobs: list):
-        load_dotenv()
-        bot_token = os.getenv("BOT_TOKEN")
-        chat_id = os.getenv('CHAT_ID')
-
-        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+       
+        if not self.bot_token or not self.chat_id:
+            raise ValueError("Missing BOT_TOKEN or CHAT_ID in .env file")
+        
+        api_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
 
         for it_job in all_it_jobs:
+
+            post_text = it_job.get("text", "")[:3850]
+            post_url = it_job.get("post_url")
             payload = {
-                "chat_id": chat_id,
-                "text": f"{it_job.get("text")} \n\n\n ORIGINAL LINK: {it_job.get("post_url")}"
+                "chat_id": self.chat_id,
+                "text": f"{post_text} \n\n\n ORIGINAL LINK: {post_url}"
             }
-
-            response = requests.post(url, payload, timeout=15)
+            response = requests.post(api_url, payload, timeout=15)
             response.raise_for_status()
+            time.sleep(0.4)
 
-        return
 
     def exec(self, urls: list):
         all_channel_it_jobs = []
@@ -104,5 +116,5 @@ class IT_JOB_FINDER:
 
 test = IT_JOB_FINDER()
 
-test.exec(['https://t.me./s/josad_it', 'https://t.me/s/geezjobs_ethiopia'])
+test.exec(['https://t.me/s/josad_it', 'https://t.me/s/geezjobs_ethiopia'])
 
