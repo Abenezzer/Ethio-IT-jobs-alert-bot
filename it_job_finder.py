@@ -1,6 +1,8 @@
 import re
+import os
 import requests
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 import links
 
 url_to_fetch = links.links
@@ -8,11 +10,8 @@ url_to_fetch = links.links
 
 class IT_JOB_FINDER:
 
-    def __init__(self):
-        self.all_jobs = []
-        self.it_jobs = []
-
     def fetch_job(self, url):
+        all_jobs = []
         response = requests.get(url, timeout=15)
         response.raise_for_status()
 
@@ -32,10 +31,13 @@ class IT_JOB_FINDER:
                 "post_url": post_link_el.get("href", "").strip(),
             }
 
-            self.all_jobs.append(post)
+            all_jobs.append(post)
 
-    def extract_it_jobs(self):
-        if not self.all_jobs:
+        return all_jobs
+
+    def extract_it_jobs(self, all_jobs:list):
+        it_jobs = []
+        if not all_jobs:
             return []
         MIN_CHARS = 40
         IT_TERMS = [
@@ -61,15 +63,46 @@ class IT_JOB_FINDER:
 
         IT_PATTERN = re.compile("|".join(IT_TERMS), re.IGNORECASE)
 
-        for job in self.all_jobs:
+        for job in all_jobs:
 
             if len(job.get("text")) > MIN_CHARS and IT_PATTERN.search(job.get("text")):
-                self.it_jobs.append(job)
+                it_jobs.append(job)
+
+        return it_jobs
+
+    def notify_telegram(self, all_it_jobs: list):
+        load_dotenv()
+        bot_token = os.getenv("BOT_TOKEN")
+        chat_id = os.getenv('CHAT_ID')
+
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+
+        for it_job in all_it_jobs:
+            payload = {
+                "chat_id": chat_id,
+                "text": f"{it_job.get("text")} \n\n\n ORIGINAL LINK: {it_job.get("post_url")}"
+            }
+
+            response = requests.post(url, payload, timeout=15)
+            response.raise_for_status()
+
+        return
+
+    def exec(self, urls: list):
+        all_channel_it_jobs = []
+
+        for url in urls:
+            all_jobs = self.fetch_job(url)
+            it_jobs = self.extract_it_jobs(all_jobs)
+            all_channel_it_jobs += it_jobs
+
+        self.notify_telegram(all_channel_it_jobs)
+
+
+
 
 
 test = IT_JOB_FINDER()
-test.fetch_job(url="https://t.me./s/josad_it")
 
-test.extract_it_jobs()
+test.exec(['https://t.me./s/josad_it', 'https://t.me/s/geezjobs_ethiopia'])
 
-print(test.it_jobs)
