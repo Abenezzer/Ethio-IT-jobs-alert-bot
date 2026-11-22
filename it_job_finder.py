@@ -16,9 +16,9 @@ class IT_JOB_FINDER:
 
         load_dotenv()
         self.bot_token = os.getenv("BOT_TOKEN")
-        self.chat_id = os.getenv("CHAT_ID")
+        self.channel_id = os.getenv("CHANNEL_ID")
         self.min_char = min_char
-
+    
         self.db_path = db_path
         self.retention_days = retention_days
 
@@ -132,8 +132,8 @@ class IT_JOB_FINDER:
 
     def notify_telegram(self, all_it_jobs: list):
 
-        if not self.bot_token or not self.chat_id:
-            raise ValueError("Missing BOT_TOKEN or CHAT_ID in .env file")
+        if not self.bot_token or not self.channel_id:
+            raise ValueError("Missing BOT_TOKEN or CHANNEL_ID in .env file")
 
         api_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
 
@@ -142,12 +142,13 @@ class IT_JOB_FINDER:
                 post_text = it_job.get("text", "")[:3850]
                 post_url = it_job.get("post_url")
                 payload = {
-                    "chat_id": self.chat_id,
+                    "chat_id": self.channel_id,
                     "text": f"{post_text} \n\n\n ORIGINAL LINK: {post_url}",
                 }
                 response = requests.post(api_url, payload, timeout=15)
                 response.raise_for_status()
                 time.sleep(0.4)
+               
                 self.mark_seen(it_job.get("post_url"))
 
     def exec(self, urls: list):
